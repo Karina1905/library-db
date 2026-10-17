@@ -1,0 +1,189 @@
+Table roles {
+  role_id smallint [pk, increment]
+  name varchar(30) [unique, not null]
+  description varchar(200)
+}
+
+Table users {
+  user_id int [pk, increment]
+  role_id smallint [not null, ref: > roles.role_id]
+  username varchar(50) [unique, not null]
+  full_name varchar(150) [not null]
+  email varchar(150) [unique, not null]
+  password_hash varchar(255) [not null]
+  updated_at timestamptz [not null, note: 'AU']
+  updated_by int [ref: > users.user_id, note: 'AU']
+  is_deleted boolean [not null, default: false, note: 'SD']
+}
+
+Table membership_plans {
+  plan_id int [pk, increment]
+  name varchar(50) [unique, not null]
+  price numeric(10,2) [not null]
+  duration_days int [not null]
+  max_loans int [not null]
+  loan_days int [not null]
+  fine_per_day numeric(8,2) [not null]
+  can_use_rooms boolean [not null]
+}
+
+Table readers {
+  reader_id int [pk, increment]
+  card_number varchar(20) [unique, not null]
+  first_name varchar(80) [not null]
+  last_name varchar(80) [not null]
+  email varchar(150) [not null]
+  phone varchar(30)
+  updated_at timestamptz [not null]
+  updated_by int [ref: > users.user_id]
+  is_deleted boolean [not null, default: false]
+}
+
+Table reader_memberships {
+  membership_id int [pk, increment]
+  reader_id int [not null, ref: > readers.reader_id]
+  plan_id int [not null, ref: > membership_plans.plan_id]
+  start_date date [not null]
+  end_date date [not null]
+  status varchar(12) [not null, note: 'active | cancelled']
+}
+
+Table publishers {
+  publisher_id int [pk, increment]
+  name varchar(150) [unique, not null]
+  country varchar(80)
+}
+Table authors {
+  author_id int [pk, increment]
+  full_name varchar(150) [not null]
+  country varchar(80)
+}
+Table categories {
+  category_id int [pk, increment]
+  parent_id int [ref: > categories.category_id]
+  name varchar(100) [unique, not null]
+}
+
+Table books {
+  book_id int [pk, increment]
+  isbn varchar(20) [not null]
+  title varchar(250) [not null]
+  publisher_id int [ref: > publishers.publisher_id]
+  category_id int [ref: > categories.category_id]
+  publish_year int
+  updated_at timestamptz [not null]
+  updated_by int [ref: > users.user_id]
+  is_deleted boolean [not null, default: false]
+}
+
+Table book_authors {
+  book_id int [not null, ref: > books.book_id]
+  author_id int [not null, ref: > authors.author_id]
+  author_order smallint [not null]
+  indexes { (book_id, author_id) [pk] }
+}
+
+Table book_copies {
+  copy_id int [pk, increment]
+  book_id int [not null, ref: > books.book_id]
+  inventory_number varchar(30) [unique, not null]
+  status varchar(12) [not null, note: 'available | loaned | reserved | lost | damaged']
+  updated_at timestamptz [not null]
+  updated_by int [ref: > users.user_id]
+  is_deleted boolean [not null, default: false]
+}
+
+Table loans {
+  loan_id bigint [pk, increment]
+  reader_id int [not null, ref: > readers.reader_id]
+  copy_id int [not null, ref: > book_copies.copy_id]
+  issued_by int [not null, ref: > users.user_id]
+  loaned_at timestamptz [not null]
+  due_date date [not null]
+  returned_at timestamptz
+  status varchar(10) [not null, note: 'active | returned']
+  updated_at timestamptz [not null]
+  updated_by int [ref: > users.user_id]
+}
+
+Table reservations {
+  reservation_id bigint [pk, increment]
+  reader_id int [not null, ref: > readers.reader_id]
+  book_id int [not null, ref: > books.book_id]
+  copy_id int [ref: > book_copies.copy_id]
+  reserved_at timestamptz [not null]
+  expires_at timestamptz
+  status varchar(12) [not null, note: 'pending | ready | fulfilled | cancelled | expired']
+}
+
+Table fines {
+  fine_id bigint [pk, increment]
+  loan_id bigint [not null, ref: > loans.loan_id]
+  reader_id int [not null, ref: > readers.reader_id]
+  amount numeric(10,2) [not null]
+  reason varchar(200) [not null]
+  status varchar(10) [not null, note: 'unpaid | paid | waived']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  updated_by int [ref: > users.user_id]
+}
+
+Table services {
+  service_id int [pk, increment]
+  name varchar(100) [unique, not null]
+  unit varchar(20) [not null]
+  unit_price numeric(10,2) [not null]
+  is_deleted boolean [not null, default: false]
+}
+
+Table service_orders {
+  order_id bigint [pk, increment]
+  reader_id int [not null, ref: > readers.reader_id]
+  service_id int [not null, ref: > services.service_id]
+  handled_by int [not null, ref: > users.user_id]
+  quantity int [not null]
+  total_price numeric(10,2) [not null]
+  status varchar(10) [not null, note: 'new | paid | cancelled']
+  ordered_at timestamptz [not null]
+}
+
+Table rooms {
+  room_id int [pk, increment]
+  name varchar(80) [unique, not null]
+  capacity int [not null]
+  hourly_price numeric(10,2) [not null]
+  is_deleted boolean [not null, default: false]
+}
+
+Table room_bookings {
+  booking_id bigint [pk, increment]
+  room_id int [not null, ref: > rooms.room_id]
+  reader_id int [not null, ref: > readers.reader_id]
+  start_time timestamptz [not null]
+  end_time timestamptz [not null]
+  total_price numeric(10,2) [not null]
+  status varchar(10) [not null, note: 'confirmed | cancelled | completed']
+}
+
+Table payments {
+  payment_id bigint [pk, increment]
+  reader_id int [not null, ref: > readers.reader_id]
+  amount numeric(10,2) [not null]
+  purpose varchar(12) [not null, note: 'fine | membership | service | room']
+  fine_id bigint [ref: > fines.fine_id]
+  membership_id int [ref: > reader_memberships.membership_id]
+  service_order_id bigint [ref: > service_orders.order_id]
+  booking_id bigint [ref: > room_bookings.booking_id]
+  paid_at timestamptz [not null]
+}
+
+Table audit_log {
+  log_id bigint [pk, increment]
+  table_name varchar(50) [not null]
+  record_id bigint
+  action varchar(6) [not null]
+  old_data jsonb
+  new_data jsonb
+  changed_by int
+  changed_at timestamptz [not null]
+}
